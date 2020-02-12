@@ -96,7 +96,7 @@ class CityScapesDataset(Dataset):
     def transform(self, img, label):
         for t in self.transforms:
             if t == 'crop':
-                csize = [256, 512]
+                csize = [200, 400]
                 s = img.size()
                 xstart = np.random.randint(0, s[1]-csize[0])
                 ystart = np.random.randint(0, s[2]-csize[1])
@@ -117,8 +117,6 @@ class CityScapesDataset(Dataset):
 
         img = np.asarray(img.convert('RGB'))
         label = np.asarray(label)
-        if self.transforms is not None:
-            img, label = self.transform(img, label)
         # reduce mean
         img = img[:, :, ::-1]  # switch to BGR
         img = np.transpose(img, (2, 0, 1)) / 255.
@@ -130,6 +128,8 @@ class CityScapesDataset(Dataset):
         img = torch.from_numpy(img.copy()).float()
         label = torch.from_numpy(label.copy()).long()
 
+        if self.transforms is not None:
+            img, label = self.transform(img, label)
 
         # create one-hot encoding
         h, w = label.shape

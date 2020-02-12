@@ -12,7 +12,7 @@ from torch.autograd import Variable
 import time, sys
 import matplotlib.pyplot as plt
 
-def plot_image(predict, y, pixel_accuracy, iter):
+def plot_image(predict, y, pixel_accuracy, iter, epoch):
     print("Saving Image")
     _, classes = torch.max(predict, 1)
     classes = classes.to('cpu')
@@ -39,19 +39,20 @@ def verify(model, ver_loader, epoch):
     for iter, (x, tar, y) in enumerate(ver_loader):
         x = x.to(device)
         y = y.to(device)
-
+        tar = tar.to(device)
         predict = model(x)
 
         ## generating classes on gpu runs oom
         ## get array of class labels for each pixel
         # print(classes.size(), y.size())
         IoU = loss(predict, y)
-        PAcc = pixel_acc(predict,y)
+        PAcc = pixel_acc(predict, y)
 
         iou_total+= IoU.item()
         pixel_accuracy += PAcc
-        if IoU.item() > pa_best:
-            plot_image(predict, y, PAcc, iter+1)
+        if PAcc > pa_best:
+            plot_image(predict, y, PAcc, iter+1, epoch)
+            pa_best = IoU.item()
         if (iter+1)%10 == 0:
             print('Intermediate Accuracy: IoU=%f PA = %f'%(iou_total/iter, pixel_accuracy/iter))
         if iter > 100:
@@ -74,7 +75,7 @@ if __name__ == '__main__':
     if model == 'unet':
         seg_model = UNet(3, n_class)
     seg_model.load_state_dict(torch.load('%s_EndEpoch_model'%model))
-    transform = ['downsample']
+    transform = ['crop']
     val_dataset = CityScapesDataset(csv_file='val.csv', transforms=transform)
     val_loader = DataLoader(dataset=val_dataset,
                         batch_size=batch_size,

@@ -21,10 +21,12 @@ def iou(pred, target):
 def pixel_acc(pred, target):
     n_correct = 0
     total = 0
+    pred = F.softmax(pred, dim=1)
+    _,classes = torch.max(pred, 1)
+    classes = classes.to(pred.get_device())
     for cls in range(n_class):
-        if labels_classes[cls][-2]:
-            continue
-        n_correct += ((torch.max(pred, 1)[1]==cls) & (target==cls)).sum()
+        if not labels_classes[cls][-2]:
+            n_correct += ((classes == cls) & (torch.max(target,1)[1] == cls)).sum()
     total = target.view(-1).size()[0]
     return float(n_correct)/float(total)
 
@@ -231,4 +233,4 @@ def dice_coeff(input, target):
     for i, c in enumerate(zip(input, target)):
         s = s + DiceCoeff().forward(c[0], c[1])
 
-    return 1.0-s / (i + 1)
+    return 1.0 - s / (i + 1)

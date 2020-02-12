@@ -13,8 +13,8 @@ import time
 
 model = 'unet'
 reload = False
-transform = ['downsample']
-batch_size=3
+transform = ['crop']
+batch_size=4
 train_dataset = CityScapesDataset(csv_file='train.csv', transforms = transform)
 test_dataset = CityScapesDataset(csv_file='test.csv', transforms = transform)
 train_loader = DataLoader(dataset=train_dataset,
