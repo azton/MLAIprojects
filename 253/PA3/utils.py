@@ -2,19 +2,19 @@ from dataloader import *
 def iou(pred, target):
     sum_intersect = 0
     sum_union = 0
+    _, classes = torch.max(pred,1)
     for cls in range(n_class):
-        if labels_classes[cls][-2]:
-            continue
+        if cls != 0:
+            # Complete this function
+            intersection = ((classes==cls) & (target==cls)).sum()# intersection calculation
+            union = (classes==cls).sum() + (target == cls).sum()-intersection #Union calculation
+            # if union == 0:
+            #     ious.append(float('nan'))  # if there is no ground truth, do not include in evaluation
+            # else:
+            sum_intersect += intersection
+            sum_union += union
 
-        # Complete this function
-        intersection = ((pred==cls) & (target==cls)).sum()# intersection calculation
-        union = (pred==cls).sum() + (target == cls).sum()-intersection #Union calculation
-        # if union == 0:
-        #     ious.append(float('nan'))  # if there is no ground truth, do not include in evaluation
-        # else:
-        sum_intersect += intersection
-        sum_union += union
-    ious = sum_intersect/sum_union# Append the calculated IoU to the list ious
+    ious = sum_intersect/(sum_union+1e-7)# Append the calculated IoU to the list ious
     return ious
 
 
@@ -24,9 +24,8 @@ def pixel_acc(pred, target):
     pred = F.softmax(pred, dim=1)
     _,classes = torch.max(pred, 1)
     classes = classes.to(pred.get_device())
-    for cls in range(n_class):
-        if not labels_classes[cls][-2]:
-            n_correct += ((classes == cls) & (torch.max(target,1)[1] == cls)).sum()
+    for cls in range(1,n_class):
+            n_correct += ((classes == cls) & (target == cls)).sum()
     total = target.view(-1).size()[0]
     return float(n_correct)/float(total)
 
@@ -148,6 +147,8 @@ def jaccard_loss(logits, true, eps=1e-7):
     cardinality = torch.sum(probas + true_1_hot, dims[0]).sum(dims[1])
     union = cardinality - intersection
     jacc_loss = (intersection / (union + eps)).mean()
+    if union == 0:
+        jacc_loss = 0
     return (1 - jacc_loss)
 
 

@@ -8,7 +8,8 @@ import torch
 import pandas as pd
 from collections import namedtuple
 
-n_class    = 34
+## set to two as test using two most common classes: nothing or road
+n_class    = 2## 34
 means     = np.array([103.939, 116.779, 123.68]) / 255. # mean of three channels in the order of BGR
 
 # a label and all meta information
@@ -83,10 +84,11 @@ labels_classes = [
 
 class CityScapesDataset(Dataset):
 
-    def __init__(self, csv_file, n_class=n_class, transforms=None):
+    def __init__(self, csv_file, n_class=n_class, transforms=None, label_nums=range(n_class)):
         self.data      = pd.read_csv(csv_file)
         self.means     = means
         self.n_class   = n_class
+        self.label_nums=label_nums
         # Add any transformations here
         self.transforms=transforms
     def __len__(self):
@@ -96,7 +98,7 @@ class CityScapesDataset(Dataset):
     def transform(self, img, label):
         for t in self.transforms:
             if t == 'crop':
-                csize = [200, 400]
+                csize = [256, 512]
                 s = img.size()
                 xstart = np.random.randint(0, s[1]-csize[0])
                 ystart = np.random.randint(0, s[2]-csize[1])
@@ -130,11 +132,15 @@ class CityScapesDataset(Dataset):
 
         if self.transforms is not None:
             img, label = self.transform(img, label)
-
+        ## TESTING: use labels nothing and road only
+        labels = torch.zeros_like(label)
+        ## set requested labels to their values, but everything else is zero
+        for i, l in enumerate(self.label_nums):
+            labels += (label==l)*l
         # create one-hot encoding
-        h, w = label.shape
-        target = torch.zeros(self.n_class, h, w)
-        for c in range(self.n_class):
-            target[c][label == c] = 1
+        # h, w = label.shape
+        # target = torch.zeros(self.n_class, h, w)
+        # for c in range(self.n_class):
+        #     target[c][label == c] = 1
 
-        return img, target, label
+        return img, labels

@@ -1,7 +1,7 @@
 from torchvision import utils
 from basic_fcn import *
 from dataloader import *
-from LiftedUnet import *
+from U_netClassifier import *
 from PIL import Image
 from utils import *
 import torchvision
@@ -27,6 +27,8 @@ def plot_image(predict, y, pixel_accuracy, iter, epoch):
     plt.imshow(y[0])
     plt.savefig('label_%f_%d.png'%(pixel_accuracy/iter, epoch))
     plt.close()
+
+
 def verify(model, ver_loader, epoch):
     model.eval()
     cuda = torch.cuda.is_available()
@@ -36,26 +38,27 @@ def verify(model, ver_loader, epoch):
     pixel_accuracy = 0
     model.to(device)
     pa_best = 0
-    for iter, (x, tar, y) in enumerate(ver_loader):
+    for iter, (x, y) in enumerate(ver_loader):
         x = x.to(device)
         y = y.to(device)
-        tar = tar.to(device)
+        if torch.sum(y) == 0:
+            continue
         predict = model(x)
 
         ## generating classes on gpu runs oom
         ## get array of class labels for each pixel
         # print(classes.size(), y.size())
-        IoU = loss(predict, y)
+        IoU = iou(predict, y)
         PAcc = pixel_acc(predict, y)
 
-        iou_total+= IoU.item()
+        iou_total+= IoU
         pixel_accuracy += PAcc
-        if PAcc > pa_best:
+        if PAcc > pa_best and PAcc != 1.0:
             plot_image(predict, y, PAcc, iter+1, epoch)
-            pa_best = IoU.item()
+            pa_best = PAcc
         if (iter+1)%10 == 0:
             print('Intermediate Accuracy: IoU=%f PA = %f'%(iou_total/iter, pixel_accuracy/iter))
-        if iter > 100:
+        if iter > 200:
             break
     
     # plt.imsave('tgt%f.png'%(pixel_accuracy/iter), tar)
