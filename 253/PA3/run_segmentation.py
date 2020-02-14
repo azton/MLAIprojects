@@ -4,7 +4,7 @@ from dataloader import *
 from utils import *
 from verify_network import *
 from U_netClassifier import *
-import torchvision
+# import torchvision
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -14,25 +14,25 @@ import time
 model = 'unet'
 err_func='Dice'
 reload = False
-label_nums = [24]
+label_nums = [7,8,11,12,13,17,19,20,21,22,23,24,25,26,27,28,31,32,33]
 n_class = len(label_nums)+1
 transform = ['crop']
 l2Reg = 0.00
 batch_size=3
-train_dataset = CityScapesDataset(csv_file='train.csv', transforms = transform)
-test_dataset = CityScapesDataset(csv_file='test.csv', transforms = transform)
+train_dataset = CityScapesDataset(csv_file='train.csv', transforms = transform, n_class=n_class)
+test_dataset = CityScapesDataset(csv_file='test.csv', transforms = transform, n_class=n_class)
 train_loader = DataLoader(dataset=train_dataset,
                           batch_size=batch_size,
-                          num_workers=0,
+                          num_workers=4,
                           shuffle=True)
-val_dataset = CityScapesDataset(csv_file='val.csv', transforms=transform)
+val_dataset = CityScapesDataset(csv_file='val.csv', transforms=transform, n_class=n_class)
 val_loader = DataLoader(dataset=val_dataset,
-                        batch_size=1,
-                        num_workers=0,
+                        batch_size=2,
+                        num_workers=4,
                         shuffle=True)
 test_loader = DataLoader(dataset=test_dataset,
                           batch_size=batch_size,
-                          num_workers=0,
+                          num_workers=4,
                           shuffle=True)
 
 
@@ -78,7 +78,8 @@ for epoch in range(epochs):
         else:
             inputs, labels = X, Y
         outputs = seg_model(inputs)
-        # print(outputs.size())
+        print(outputs.size(), labels.size())
+        print(torch.max(labels)[0])
         loss = criterion(outputs, labels)
         record_loss = loss.item()
         epoch_loss += record_loss

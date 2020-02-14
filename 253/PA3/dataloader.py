@@ -1,7 +1,7 @@
 from torch.utils.data import Dataset, DataLoader# For custom data-sets
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from skimage import transform
+# from skimage import transform
 import numpy as np
 from PIL import Image
 import torch
@@ -9,7 +9,7 @@ import pandas as pd
 from collections import namedtuple
 
 ## set to two as test using two most common classes: nothing or road
-n_class    = 2## 34
+n_class    = 34
 means     = np.array([103.939, 116.779, 123.68]) / 255. # mean of three channels in the order of BGR
 
 # a label and all meta information
@@ -98,7 +98,7 @@ class CityScapesDataset(Dataset):
     def transform(self, img, label):
         for t in self.transforms:
             if t == 'crop':
-                csize = [256, 512]
+                csize = [512, 1024]
                 s = img.size()
                 xstart = np.random.randint(0, s[1]-csize[0])
                 ystart = np.random.randint(0, s[2]-csize[1])
@@ -136,7 +136,7 @@ class CityScapesDataset(Dataset):
         labels = torch.zeros_like(label)
         ## set requested labels to their values, but everything else is zero
         for i, l in enumerate(self.label_nums):
-            labels += (label==l)*l
+            labels += (label==l).long()*(i+1) # labels start at one.  Any ignored labels are zero
         # create one-hot encoding
         # h, w = label.shape
         # target = torch.zeros(self.n_class, h, w)
