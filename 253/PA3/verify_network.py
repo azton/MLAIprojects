@@ -10,6 +10,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 import time, sys
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 def plot_image(predict, y, pixel_accuracy, iter, epoch):
@@ -21,12 +23,15 @@ def plot_image(predict, y, pixel_accuracy, iter, epoch):
     # print(np.shape(y), np.shape(classes), tar.size())
     plt.figure()    
     im = plt.imshow(classes[0])
-    plt.savefig('classes_%f_%d.png'%(pixel_accuracy/iter, epoch))
+    plt.savefig('images/classes_%f_%d.png'%(pixel_accuracy/iter, epoch))
     plt.close()
     plt.figure()
     plt.imshow(y[0])
-    plt.savefig('label_%f_%d.png'%(pixel_accuracy/iter, epoch))
+    plt.savefig('images/label_%03d_%0.4f.png'%( epoch, pixel_accuracy/epoch))
     plt.close()
+    del(classes)
+    del (y)
+
 
 
 def verify(model, ver_loader, epoch):
@@ -48,8 +53,8 @@ def verify(model, ver_loader, epoch):
         ## generating classes on gpu runs oom
         ## get array of class labels for each pixel
         # print(classes.size(), y.size())
-        IoU = iou(predict, y)
-        PAcc = pixel_acc(predict, y)
+        IoU = float(iou(predict, y))
+        PAcc = float(pixel_acc(predict, y))
 
         iou_total+= IoU
         pixel_accuracy += PAcc
@@ -58,8 +63,8 @@ def verify(model, ver_loader, epoch):
             pa_best = PAcc
         if (iter+1)%10 == 0:
             print('Intermediate Accuracy: IoU=%f PA = %f'%(iou_total/iter, pixel_accuracy/iter))
-        if iter > 200:
-            break
+        # if iter > 200:
+        #     break
     
     # plt.imsave('tgt%f.png'%(pixel_accuracy/iter), tar)
     iou_avg = iou_total/len(ver_loader)

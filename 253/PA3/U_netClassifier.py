@@ -54,8 +54,9 @@ class ReductionBlock(nn.Module):
         return x, y
 
 class ExpansionBlock(nn.Module):
-    def __init__(self, in_channels, l1_channels, out_channels, filter_size=3):
+    def __init__(self, in_channels, l1_channels, out_channels, filter_size=3, deconv=True):
         super(ExpansionBlock, self).__init__()
+        self.deconv = deconv
         self.conv1 = BasicConv(in_channels, l1_channels, filter_size)
         self.bn1 = nn.BatchNorm2d(l1_channels)
         self.conv2 = BasicConv(l1_channels, out_channels, filter_size)
@@ -72,9 +73,27 @@ class ExpansionBlock(nn.Module):
         x = self.conv2(x)
         x = self.bn2(x)
         x = self.relu(x)
-        x = self.upconv(x)
-        x = self.bnup(x)
+        if self.deconv:
+            x = self.upconv(x)
+            x = self.bnup(x)
         return x
+
+class BottleneckBlock(nn.Module):
+    def __init__(self, in_channels, l1_channels, out_channels, filter_size=3):
+        super(BottleneckBlock, self).__init__()
+        self.conv1 = BasicConv(in_channels, l1_channels, filter_size)
+        self.bn1 = nn.BatchNorm2d(l1_channels)
+        self.relu = nn.ReLU()
+        self.conv2 = BasicConv(l1_channels, out_channels, filter_size)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.upconv = UpConv(out_channels, out_channels, filter_size=2, stride=2)
+    
+    def forward(self,x):
+        x = self.bn1(self.relu(self.conv1(x)))
+        x = self.upconv(self.bn2(self.relu(self.conv2(x))))
+
+        return x
+
 
 class UNet(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -88,17 +107,19 @@ class UNet(nn.Module):
         self.max_pool = nn.MaxPool2d(2, stride=2)
         self.Reduce2 = ReductionBlock(64, 64, 128)
         self.Reduce3 = ReductionBlock(128, 128, 256)
-        self.Reduce4 = ReductionBlock(256, 256, 512)
+        # self.Reduce4 = ReductionBlock(256, 256, 512)
 
         '''
             Expansion Blocks
         '''
+        self.baseU = BottleneckBlock(256, 256, 512)
         self.max_bypass = nn.MaxPool2d(kernel_size=9, stride=1, padding=0)
         self.max_half = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.Exp1 = ExpansionBlock(1024, 256, 256)
-        self.Exp2 = ExpansionBlock(512, 128, 128)
-        self.Exp3 = ExpansionBlock(256, 64, 64)
-        # self.Exp4 = ExpansionBlock(128, 32, 32)
+        # self.Exp1 = ExpansionBlock(1024, 256, 256)
+        self.Exp2 = ExpansionBlock(512+256, 256, 256)
+        self.Exp3 = ExpansionBlock(256+128, 128, 128)
+        ## final block doesnt need deconvolution
+        self.Exp4 = ExpansionBlock(128+64, 64, 64, deconv=False)
         ## final 1x1x1 convolution to get right number of outputs
         self.FinalConv = BasicConv(64, out_channels, filter_size=3, stride=1)
 
@@ -119,17 +140,19 @@ class UNet(nn.Module):
         x, catx1 = self.Reduce1(x)
         x , catx2 = self.Reduce2(x)
         x, catx3 = self.Reduce3(x)
-        x, catx4 = self.Reduce4(x)
+        # x, catx4 = self.Reduce4(x)
         '''
             expand
         '''
-        x = self.crop(x, catx4)
-        x = self.Exp1(x,catx4)
+        x = self.baseU(x)
+        # x = self.crop(x, catx4)
+        # x = self.Exp1(x,catx4)
         x = self.crop(x, catx3)
         x = self.Exp2(x, catx3)
         x= self.crop(x, catx2)
         x = self.Exp3(x, catx2)
-        # x = self.Exp4(x, catx1)
+        x = self.crop(x,catx1)
+        x = self.Exp4(x, catx1)
         x = self.FinalConv(x)
         '''
             classifier out of it

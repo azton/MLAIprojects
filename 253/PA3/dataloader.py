@@ -98,7 +98,7 @@ class CityScapesDataset(Dataset):
     def transform(self, img, label):
         for t in self.transforms:
             if t == 'crop':
-                csize = [512, 1024]
+                csize = [256, 512]
                 s = img.size()
                 xstart = np.random.randint(0, s[1]-csize[0])
                 ystart = np.random.randint(0, s[2]-csize[1])
