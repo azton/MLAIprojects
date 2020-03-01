@@ -6,11 +6,13 @@ class BasicConv(nn.Block):
     ''' 
         basic convolution with activation and batchnorm built into it
     '''
-    def __init__(self,c2, kernel_size=3, strides=1, padding=1, activation='relu'):
+    def __init__(self,c2, kernel_size=3, strides=1, padding=1, activation='relu',\
+                    bias=False):
         super(BasicConv, self).__init__()
         self.c1 = nn.Conv3D(c2, kernel_size=kernel_size, \
                         strides=strides, padding=padding, \
-                        activation='relu', weight_initializer=init.Xavier())    
+                        activation='relu', weight_initializer=init.Xavier(), 
+                        use_bias=bias)    
         self.bn = nn.BatchNorm()
 
     def forward(self, x):
@@ -45,8 +47,9 @@ class Expansion(nn.Block):
         '''
 
         self.upconv = nn.Conv3DTranspose(c1, kernel_size=2, strides=1, padding=0,\
-                        activation='relu')
-        self.upBN = nn.BatchNorm()
+                        use_bias=False, weight_initializer=init.Bilinear())
+        self.upconv.collect_params().setattr('grad_req','null')
+        # self.upBN = nn.BatchNorm()
 
         self.conv1 = BasicConv(c1)
         self.conv2 = BasicConv(c2)
@@ -54,9 +57,9 @@ class Expansion(nn.Block):
 
     def forward(self, x, y):
         x = self.upconv(x)
-        x = self.upBN(x)
-        z = np.concatenate([x,y], axis=1)
-        x = self.conv1(z)
+        # x = self.upBN(x)
+        x = np.concatenate([x,y], axis=1)
+        x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         return x
@@ -85,17 +88,17 @@ class Unet3d(nn.Block):
         # self.preprocess.add(nn.MaxPool3d(pool_size=2, stride=2))
         # self.preprocess.add(nn.BasicConv(32))
 
-        self.reduce1 = Reduction(32,64)
-        self.reduce2 = Reduction(64,128)
-        self.reduce3 = Reduction(128, 256)
-        self.reduce4 = Reduction(256, 512)
+        self.reduce1 = Reduction(16,32)
+        self.reduce2 = Reduction(32,48)
+        self.reduce3 = Reduction(48, 64)
+        # self.reduce4 = Reduction(64, 128)
 
-        self.neck = BottleNeck(512,1024)
+        self.neck = BottleNeck(64, 128)
 
-        self.expand4 = Expansion(512, 256)
-        self.expand3 = Expansion(256, 128)
-        self.expand2 = Expansion(128, 64)
-        self.expand1 = Expansion(64,32)
+        # self.expand4 = Expansion(128, 64)
+        self.expand3 = Expansion(64, 48)
+        self.expand2 = Expansion(48, 32)
+        self.expand1 = Expansion(32,16)
 
         self.finalout = BasicConv(1, kernel_size=1, strides=1, padding=0, 
                     activation = 'sigmoid')
@@ -106,11 +109,11 @@ class Unet3d(nn.Block):
         x, cat1 = self.reduce1(x)
         x, cat2 = self.reduce2(x)
         x, cat3 = self.reduce3(x)
-        x, cat4 = self.reduce4(x)
+        # x, cat4 = self.reduce4(x)
 
         x = self.neck(x)
 
-        x = self.expand4(x, cat4)
+        # x = self.expand4(x, cat4)
         x = self.expand3(x, cat3)
         x = self.expand2(x, cat2)
         x = self.expand1(x, cat1)

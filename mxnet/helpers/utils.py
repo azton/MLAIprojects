@@ -2,6 +2,7 @@ import matplotlib, torch, os, sys
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from collections import defaultdict
+from mxnet import np, npx
 
 class Recorder():
     def __init__(self, model, out_dir, segmentation=True):
@@ -143,57 +144,59 @@ def save_state(filepath, model, epoch, optimizer, loss=None):
             'loss': loss},\
             filepath)
 
+
+
+def pixel_accuracy(output, y):
+    '''
+        binary class prediction accuracy. 
+        output is dim(B, 1, W, H, {D})
+        target is dim(B,  W, H, {D})
+    '''
+    true_pos = np.sum(y)
+    if output.shape[1] == 1:
+        classes = (output > 0.5).astype('float32')
+    if output.shape[1] == 2:
+        classes = np.argmax(output, axis=1)
+    acc = (classes.astype('bool') * y.astype('bool')).sum()
+    # print('Acc:',acc)
+    if true_pos > 0:
+        pix_acc = acc/y.sum().astype('float32')
+    if true_pos == 0 and acc == 0:
+        pix_acc = 1.0
+    if true_pos == 0 and acc != 0:
+        pix_acc = 0.0
+
+    return pix_acc
+
+
 def IoU(pred, target):
     eps = 1e-7
+    '''
+        iou or jaccard loss for binary classes
+    '''
+    intersect = pixel_accuracy(pred, target)*target.sum()
+    if pred.shape[1] == 1:
+        classes = (pred > 0.5).astype('int32')
+    else:
+        classes = np.argmax(pred, axis=1)
+    union = pred.sum()+target.sum().astype('int32')-intersect.astype('int32')
 
-    n_class = pred.size()[1]
-    batch = pred.size()[0]
-    sum_ious = torch.zeros(batch)
-    for b in range(batch):
-        for cls in range(0,n_class):
-            intersection = (pred[b,cls] * (target[b] == cls).float()).sum()
-            union = (pred[b,cls]).sum().float() + (target[b] == cls).sum().float() - intersection
-            sum_ious[b] = intersection/(union+eps)
-    sum_ious = sum_ious.mean()
+
+    if union > 0:
+        sum_ious = intersect/(union+eps)
+    elif union <= 0:
+        sum_ious = 0
+
     '''
         Autograd wants to minimize a loss, so negate the IOU
     '''
     return 1.- sum_ious
 
-# this is handled by the scheduler and shouldnt be called
-# def update_learning_rate(optimizer, learn_rate):
-#     for param_group in optimizer.param_groups:
-#         param_group['lr'] = learn_rate
-#     return optimizer
 
 
-def pixel_acc(pred, target):
-    '''
-        binary class prediction accuracy. 
-        pred is dim(B, 2, W, H, {D})
-        target is dim(B, W, H)
-    '''
-
-    pred = F.softmax(pred, dim=1)
-    # _,classes = torch.max(pred, 1)
-    # classes = classes.to(target.get_device())
-    pavg = 0
-    n_class = pred.size()[1]
-    batch = pred.size()[0]
-    for b in range(batch):
-        for cls in range(1, n_class):
-            intersection = float((pred[b, cls] * (target[b] == cls).float()).sum())
-            if (target[b].sum() == 0) and ((pred[b,cls] > 0.5).sum() == 0):
-                pavg+= 1
-            elif (target[b].sum() == 0) and ((pred[b,cls] > 0.5).sum() != 0):
-                pavg += 0
-            else:
-                pavg += intersection/float(target[b].sum())
-    return pavg/batch
 
 
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
 
 
 """Common image segmentation losses.
